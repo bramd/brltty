@@ -1545,29 +1545,79 @@ usbChooseChannel (UsbDevice *device, UsbChooseChannelData *data) {
     uint16_t product = getLittleEndian16(descriptor->idProduct);
 
     const char *const *drivers = usbGetDriverCodes(vendor, product);
-    if (!drivers) return 0;
+    if (!drivers) {
+      logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "no drivers");
+      return 0;
+    }
   }
 
   for (const UsbChannelDefinition *definition = data->definition;
        definition->vendor; definition+=1) {
-    if (definition->version && (definition->version != getLittleEndian16(descriptor->bcdUSB))) continue;
-    if (!USB_IS_PRODUCT(descriptor, definition->vendor, definition->product)) continue;
+    logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG,
+      "checking definition #%ld", (definition - data->definition)
+    );
+
+    {
+      uint16_t usbVersion = getLittleEndian16(descriptor->bcdUSB);
+
+      if (definition->version && (definition->version != usbVersion)) {
+        logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG,
+          "wrong USB version: %04X", usbVersion
+        );
+
+        continue;
+      }
+    }
+
+    if (!USB_IS_PRODUCT(descriptor, definition->vendor, definition->product)) {
+      logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "wrong USB vendor/product");
+      continue;
+    }
 
     if (!data->genericDevices) {
       const UsbSerialAdapter *adapter = usbFindSerialAdapter(descriptor);
-      if (adapter && adapter->generic) continue;
+
+      if (adapter && adapter->generic) {
+        logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "has generic adapter");
+        continue;
+      }
     }
 
-    if (!usbVerifyVendorIdentifier(descriptor, data->vendorIdentifier)) continue;
-    if (!usbVerifyProductIdentifier(descriptor, data->productIdentifier)) continue;
-    if (!usbVerifySerialNumber(device, data->serialNumber)) continue;
+    if (!usbVerifyVendorIdentifier(descriptor, data->vendorIdentifier)) {
+      logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "wrong vendor identifier");
+      continue;
+    }
 
-    if (!usbVerifyStrings(device, definition->manufacturers, descriptor->iManufacturer)) continue;
-    if (!usbVerifyStrings(device, definition->products, descriptor->iProduct)) continue;
+    if (!usbVerifyProductIdentifier(descriptor, data->productIdentifier)) {
+      logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "wrong product identifier");
+      continue;
+    }
+
+    if (!usbVerifySerialNumber(device, data->serialNumber)) {
+      logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "wrong serial number");
+      continue;
+    }
+
+    if (!usbVerifyStrings(device, definition->manufacturers, descriptor->iManufacturer)) {
+      logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "urecognized manufacturer string");
+      continue;
+    }
+
+    if (!usbVerifyStrings(device, definition->products, descriptor->iProduct)) {
+      logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "urecognized product string");
+      continue;
+    }
 
     if (definition->verifyInterface) {
-      if (!usbConfigureDevice(device, definition->configuration)) continue;
-      if (!usbVerifyInterface(device, definition)) continue;
+      if (!usbConfigureDevice(device, definition->configuration)) {
+        logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "device configuration failure");
+        continue;
+      }
+
+      if (!usbVerifyInterface(device, definition)) {
+        logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "interface failed verification");
+        continue;
+      }
     }
 
     data->definition = definition;
