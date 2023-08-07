@@ -1524,7 +1524,7 @@ struct UsbChooseChannelDataStruct {
 static int
 usbChooseChannel (UsbDevice *device, UsbChooseChannelData *data) {
   const UsbDeviceDescriptor *descriptor = &device->descriptor;
-  logBytes(LOG_CATEGORY(USB_IO), "device descriptor", descriptor, sizeof(*descriptor));
+  logBytes(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "device descriptor", descriptor, sizeof(*descriptor));
 
   if (!(descriptor->iManufacturer || descriptor->iProduct || descriptor->iSerialNumber)) {
     UsbDeviceDescriptor actualDescriptor;
@@ -1533,7 +1533,7 @@ usbChooseChannel (UsbDevice *device, UsbChooseChannelData *data) {
     if (result == UsbDescriptorSize_Device) {
       device->descriptor = actualDescriptor;
 
-      logBytes(LOG_CATEGORY(USB_IO),
+      logBytes(LOG_CATEGORY(USB_IO) | LOG_DEBUG,
         "using actual device descriptor",
         descriptor, sizeof(*descriptor)
       );
@@ -1553,8 +1553,10 @@ usbChooseChannel (UsbDevice *device, UsbChooseChannelData *data) {
 
   for (const UsbChannelDefinition *definition = data->definition;
        definition->vendor; definition+=1) {
+    intptr_t definitionIndex = definition - data->definition;
+
     logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG,
-      "checking definition #%ld", (definition - data->definition)
+      "checking definition #%"PRIdPTR, definitionIndex
     );
 
     {
@@ -1620,10 +1622,12 @@ usbChooseChannel (UsbDevice *device, UsbChooseChannelData *data) {
       }
     }
 
+    logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "definition found");
     data->definition = definition;
     return 1;
   }
 
+  logMessage(LOG_CATEGORY(USB_IO) | LOG_DEBUG, "definition not found");
   return 0;
 }
 
